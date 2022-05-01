@@ -1,5 +1,6 @@
 <script>
 const EMPTY = "/";
+const SIZE = 35;
 const setColor = (element, color) => {
   element.style.backgroundColor = color;
 };
@@ -17,22 +18,49 @@ const normalize = (num) => {
 export default {
   data() {
     return {
-      grid: new Array(15 * 15).fill(" "),
+      grid: Array(15 * 15).fill(" "),
       vertical: false,
+      back: false,
       active: {
         i: null,
         row: null,
         col: null,
         el: null,
       },
-      lastBack: false,
     };
   },
   methods: {
+    label() {
+      let l = 1;
+      this.$refs.labels.forEach((el, i) => {
+        const row = Math.floor(i / 15);
+        const col = i % 15;
+
+        el.style.top = `${row * SIZE + 1.5}px`;
+        el.style.left = `${col * SIZE + 1.5}px`;
+
+        el.style.display = "none";
+
+        if (this.grid[row * 15 + col] !== EMPTY) {
+          if (row === 0 || col === 0) {
+            el.style.display = "unset";
+            el.textContent = l;
+            l++;
+          }
+
+          const top = this.grid[(row - 1) * 15 + col];
+          const left = this.grid[row * 15 + col - 1];
+          if (top === EMPTY || left === EMPTY) {
+            el.style.display = "unset";
+            el.textContent = l;
+            l++;
+          }
+        }
+      });
+    },
     setItem(v, i) {
       this.grid[i] = v;
-      const storage = JSON.stringify(this.grid);
-      localStorage.setItem("grid", storage);
+      localStorage.setItem("grid", JSON.stringify(this.grid));
     },
     colorUpdate(e) {
       const { row, col, i } = this.active;
@@ -61,11 +89,12 @@ export default {
 
       this.colorUpdate(e);
       this.setItem(e.target.value.toUpperCase(), i);
+      this.label();
 
       if (this.vertical) {
-        row = normalize(row + (this.lastBack ? -1 : 1));
+        row = normalize(row + (this.back ? -1 : 1));
       } else {
-        col = normalize(col + (this.lastBack ? -1 : 1));
+        col = normalize(col + (this.back ? -1 : 1));
       }
 
       this.moveActive(e, row * 15 + col);
@@ -119,15 +148,8 @@ export default {
       }
       this.colorFocus();
     },
-    colorMount() {
-      this.$refs.items.forEach((item, i) => {
-        if (this.grid[i] === EMPTY) {
-          setColor(item, "black");
-        }
-      });
-    },
     navigate(e) {
-      this.lastBack = e.key === "Backspace";
+      this.back = e.key === "Backspace";
       const arrows = new Set([
         "ArrowRight",
         "ArrowLeft",
@@ -153,13 +175,26 @@ export default {
         this.moveActive(e, row * 15 + col);
       }
     },
+    clear() {
+      this.grid = new Array(15 * 15).fill(" ");
+      localStorage.setItem("grid", JSON.stringify(this.grid));
+      this.$refs.items.forEach((item) => {
+        setColor(item, "white");
+      });
+      this.label();
+    },
   },
   mounted() {
     window.addEventListener("keydown", this.navigate);
     const storage = localStorage.getItem("grid");
     if (storage) {
       this.grid = JSON.parse(storage);
-      this.colorMount();
+      this.$refs.items.forEach((item, i) => {
+        if (this.grid[i] === EMPTY) {
+          setColor(item, "black");
+        }
+      });
+      this.label();
     }
   },
   beforeUnmount() {
@@ -171,34 +206,62 @@ export default {
 <template>
   <article>
     <h2>Crossword grid</h2>
-    <section class="grid">
-      <input
-        class="item"
-        maxlength="1"
-        ref="items"
-        v-for="(_, i) in grid"
-        :key="i"
-        :value="grid[i]"
-        @click="(e) => e.target.select()"
-        @focus="(e) => focus(e, i)"
-        @input="update"
-      />
+    <button role="button" class="clear" @click="clear">Clear</button>
+    <section class="crossword">
+      <section class="grid">
+        <input
+          class="item"
+          maxlength="1"
+          ref="items"
+          v-for="(_, i) in grid"
+          :key="i"
+          :value="grid[i]"
+          :id="`input-${i}`"
+          @click="(e) => e.target.select()"
+          @focus="(e) => focus(e, i)"
+          @input="update"
+        />
+      </section>
+      <section>
+        <label
+          v-for="(_, i) in grid"
+          :key="i"
+          :for="`input-${i}`"
+          class="label"
+          ref="labels"
+        ></label>
+      </section>
     </section>
   </article>
 </template>
 
 <style>
 :root {
-  --size: 30px;
+  --size: 35px;
+}
+
+.crossword {
+  position: relative;
+}
+
+.clear {
+  margin-bottom: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgb(211, 222, 226);
+  border: none;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.clear:hover {
+  background-color: rgb(165, 172, 175);
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(15, var(--size));
   width: fit-content;
-  border: 1px solid black;
-  background-color: black;
-  gap: 1px;
+  outline: 1px solid black;
 }
 
 .item {
@@ -210,13 +273,18 @@ export default {
   font-weight: bold;
   background-color: white;
   padding: 0;
+  outline: 1px solid black;
   border: unset;
   text-align: center;
   text-transform: uppercase;
 }
 
+.label {
+  position: absolute;
+  font-size: 9px;
+}
+
 .item:focus-visible {
-  outline: none;
   background-color: lightcoral;
   caret-color: transparent;
 }
