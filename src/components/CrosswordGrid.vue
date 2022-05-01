@@ -1,13 +1,21 @@
 <script>
+const EMPTY = "/";
+
 export default {
   data() {
     return {
-      grid: new Array(15 * 15).fill("_"),
+      grid: new Array(15 * 15).fill(" "),
       vertical: false,
       activeIndex: null,
+      lastBack: false,
     };
   },
   methods: {
+    fill(v, i) {
+      this.grid[i] = v;
+      const storage = JSON.stringify(this.grid);
+      localStorage.setItem("grid", storage);
+    },
     colorBlack(e, i) {
       const row = Math.floor(i / 15);
       const col = i % 15;
@@ -15,20 +23,20 @@ export default {
       const ocol = Math.abs(15 - col) - 1;
 
       const item = this.$refs.items[i];
-      if (e.target.value === " ") {
+      if (e.target.value === EMPTY) {
         item.style.backgroundColor = "black";
         this.$refs.items[orow * 15 + ocol].style.backgroundColor = "black";
-        this.grid[orow * 15 + ocol] = " ";
+        this.fill(EMPTY, orow * 15 + ocol);
       } else {
         if (item.style.backgroundColor === "black") {
           item.style.backgroundColor = "white";
         }
       }
 
-      if (this.grid[i] === " " && e.target.value !== " ") {
+      if (this.grid[i] === EMPTY && e.target.value !== EMPTY) {
         item.style.backgroundColor = "lightcoral";
         this.$refs.items[orow * 15 + ocol].style.backgroundColor = "white";
-        this.grid[orow * 15 + ocol] = "_";
+        this.fill(" ", orow * 15 + ocol);
       }
     },
     colorRow(row) {
@@ -36,7 +44,7 @@ export default {
       for (let i = 0; i < 15; i++) {
         const index = row * 15 + i;
         const item = this.$refs.items[index];
-        if (item !== selected && this.grid[index] !== " ") {
+        if (item !== selected && this.grid[index] !== EMPTY) {
           item.style.backgroundColor = "lightyellow";
         }
       }
@@ -46,7 +54,7 @@ export default {
       for (let i = 0; i < 15; i++) {
         const index = i * 15 + col;
         const item = this.$refs.items[index];
-        if (item !== selected && this.grid[index] !== " ") {
+        if (item !== selected && this.grid[index] !== EMPTY) {
           item.style.backgroundColor = "lightyellow";
         }
       }
@@ -63,7 +71,7 @@ export default {
           item.style.backgroundColor = "white";
         }
         if (item === document.activeElement) {
-          if (this.grid[i] === " ") {
+          if (this.grid[i] === EMPTY) {
             item.style.backgroundColor = "black";
           } else {
             item.style.backgroundColor = "lightcoral";
@@ -77,19 +85,32 @@ export default {
         this.colorRow(row);
       }
     },
+    colorMask() {
+      this.$refs.items.forEach((item, i) => {
+        if (this.grid[i] === EMPTY) {
+          item.style.backgroundColor = "black";
+        }
+      });
+    },
     update(e, i) {
       this.colorBlack(e, i);
-      this.grid[i] = String(e.target.value).toUpperCase();
+      this.fill(String(e.target.value).toUpperCase(), i);
 
       let row = Math.floor(this.activeIndex / 15);
       let col = this.activeIndex % 15;
       if (this.vertical) {
-        row++;
+        row += this.lastBack ? -1 : 1;
+        if (row < 0) {
+          row = 0;
+        }
         if (row > 14) {
           row = 14;
         }
       } else {
-        col++;
+        col += this.lastBack ? -1 : 1;
+        if (col < 0) {
+          col = 0;
+        }
         if (col > 14) {
           col = 14;
         }
@@ -113,6 +134,7 @@ export default {
       this.colorFocus(this.activeIndex);
     },
     navigate(e) {
+      this.lastBack = e.key === "Backspace";
       const arrows = new Set([
         "ArrowRight",
         "ArrowLeft",
@@ -155,6 +177,11 @@ export default {
   },
   mounted() {
     window.addEventListener("keydown", this.navigate);
+    const storage = localStorage.getItem("grid");
+    if (storage) {
+      this.grid = JSON.parse(storage);
+      this.colorMask();
+    }
   },
   beforeUnmount() {
     window.removeEventListener("keydown", this.navigate);
@@ -168,8 +195,7 @@ export default {
     <section class="grid">
       <input
         class="item"
-        pattern="[a-zA-Z _]"
-        placeholder="_"
+        pattern="[a-zA-Z /]"
         maxlength="1"
         ref="items"
         v-for="(_, i) in grid"
