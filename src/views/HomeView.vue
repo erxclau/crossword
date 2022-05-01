@@ -1,7 +1,11 @@
 <script setup>
-// import TheWelcome from "@/components/TheWelcome.vue";
+import CrosswordGrid from "@/components/CrosswordGrid.vue";
 </script>
 
 <template>
-  <main>home</main>
+  <main>
+    <CrosswordGrid />
+  </main>
 </template>
+
+<style></style>

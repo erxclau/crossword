@@ -12,3 +12,7 @@ import { RouterLink, RouterView } from "vue-router";
 
   <RouterView />
 </template>
+
+<style>
+@import "./assets/base.css";
+</style>
