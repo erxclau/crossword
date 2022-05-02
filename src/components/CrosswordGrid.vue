@@ -19,6 +19,7 @@ export default {
   data() {
     return {
       grid: Array(15 * 15).fill(" "),
+      hints: Array(),
       vertical: false,
       back: false,
       active: {
@@ -32,6 +33,14 @@ export default {
   methods: {
     label() {
       let l = 1;
+      this.hints = Array();
+
+      const setLabel = (el) => {
+        el.style.display = "unset";
+        el.textContent = l;
+        l++;
+      };
+
       this.$refs.labels.forEach((el, i) => {
         const row = Math.floor(i / 15);
         const col = i % 15;
@@ -42,18 +51,48 @@ export default {
         el.style.display = "none";
 
         if (this.grid[row * 15 + col] !== EMPTY) {
-          if (row === 0 || col === 0) {
-            el.style.display = "unset";
-            el.textContent = l;
-            l++;
-          }
-
           const top = this.grid[(row - 1) * 15 + col];
           const left = this.grid[row * 15 + col - 1];
-          if (top === EMPTY || left === EMPTY) {
-            el.style.display = "unset";
-            el.textContent = l;
-            l++;
+          if (row === 0 || col === 0) {
+            if (row === 0) {
+              this.hints.push({
+                index: row * 15 + col,
+                label: l,
+                type: "down",
+                hint: null,
+              });
+            }
+
+            if (col === 0) {
+              this.hints.push({
+                index: row * 15 + col,
+                label: l,
+                type: "across",
+                hint: null,
+              });
+            }
+            setLabel(el);
+          } else if (top === EMPTY || left === EMPTY) {
+            if (top === EMPTY) {
+              this.hints.push({
+                index: row * 15 + col,
+                label: l,
+                type: "down",
+                hint: null,
+              });
+            }
+
+            if (left === EMPTY) {
+              if (col === 0) {
+                this.hints.push({
+                  index: row * 15 + col,
+                  label: l,
+                  type: "across",
+                  hint: null,
+                });
+              }
+            }
+            setLabel(el);
           }
         }
       });
@@ -176,7 +215,8 @@ export default {
       }
     },
     clear() {
-      this.grid = new Array(15 * 15).fill(" ");
+      this.grid = Array(15 * 15).fill(" ");
+      this.hints = Array();
       localStorage.setItem("grid", JSON.stringify(this.grid));
       this.$refs.items.forEach((item) => {
         setColor(item, "white");
@@ -232,6 +272,7 @@ export default {
         ></label>
       </section>
     </section>
+    <section class="hints"></section>
   </article>
 </template>
 
