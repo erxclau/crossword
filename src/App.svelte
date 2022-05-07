@@ -6,26 +6,72 @@
   const block = "/";
   let grid = Array();
   let labels = Array();
+  let down = Array();
+  let across = Array();
   let vertical = false;
 
   let current;
 
   $: grid.length && localStorage.setItem("grid", JSON.stringify(grid));
+  $: down.length && localStorage.setItem("down", JSON.stringify(down));
+  $: across.length && localStorage.setItem("across", JSON.stringify(across));
+
   $: (() => {
     labels = grid.reduce((arr, sq, i) => {
       const { row, col } = coordinate(i);
       if (sq !== block) {
-        const top = grid[(row - 1) * 15 + col];
-        const left = grid[row * 15 + col - 1];
+        const top = grid[(row - 1) * size + col];
+        const left = grid[row * size + col - 1];
 
         if (row === 0 || col === 0) {
-          arr.push({ index: i, text: arr.length + 1 });
+          arr.push({
+            index: i,
+            text: arr.length + 1,
+            down: row === 0,
+            across: col === 0,
+          });
         } else if (top === block || left === block) {
-          arr.push({ index: i, text: arr.length + 1 });
+          arr.push({
+            index: i,
+            text: arr.length + 1,
+            down: top === block,
+            across: left === block,
+          });
         }
       }
       return arr;
     }, Array());
+  })();
+
+  $: (() => {
+    down = labels
+      .filter((label) => label.down)
+      .map((label, i) => {
+        const hint = down.length > i ? down[i].hint : "";
+        let { row, col } = coordinate(label.index);
+        let word = "";
+        let idx = row * size + col;
+        while (row < size && grid[idx] !== empty && grid[idx] !== block) {
+          word += grid[idx];
+          idx = ++row * size + col;
+        }
+        return { word: word.trim(), text: label.text, hint: hint };
+      });
+
+    across = labels
+      .filter((label) => label.across)
+      .map((label, i) => {
+        const hint = across.length > i ? across[i].hint : "";
+        let { row, col } = coordinate(label.index);
+        let word = "";
+        let idx = row * size + col;
+        while (col < size && grid[idx] !== empty && grid[idx] !== block) {
+          word += grid[idx];
+          idx = row * size + ++col;
+        }
+
+        return { word: word.trim(), text: label.text, hint: hint };
+      });
   })();
 
   const row = (i) => Math.floor(i / size);
@@ -68,8 +114,13 @@
     current = i;
   };
 
-  const clear = () => {
+  const clearGrid = () => {
     grid = Array(size * size).fill(empty);
+  };
+
+  const clearHints = () => {
+    down = Array();
+    across = Array();
   };
 
   const reflect = (i) => {
@@ -80,8 +131,18 @@
   };
 
   onMount(() => {
-    const storage = localStorage.getItem("grid");
-    grid = storage ? JSON.parse(storage) : Array(size * size).fill(empty);
+    const localGrid = localStorage.getItem("grid");
+    grid = localGrid ? JSON.parse(localGrid) : Array(size * size).fill(empty);
+
+    const localDown = localStorage.getItem("down");
+    if (localDown) {
+      down = JSON.parse(localDown);
+    }
+
+    const localAcross = localStorage.getItem("across");
+    if (localAcross) {
+      across = JSON.parse(localAcross);
+    }
   });
 </script>
 
@@ -115,7 +176,7 @@
 />
 
 <main style="--size: {size};">
-  <h2>Crossword</h2>
+  <h1>Crossword</h1>
   <details>
     <summary><b>Guidelines</b></summary>
     <ol>
@@ -126,57 +187,90 @@
       <li>The puzzle theme must total at least 33 squares</li>
     </ol>
   </details>
-  <button class="clear" on:click={clear}>Clear</button>
-  <section id="grid">
-    {#each grid as square, i}
-      <input
-        id="square-{i}"
-        class="square"
-        class:block={square === block}
-        class:active={i === current}
-        class:axis={(() => {
-          const axis = vertical ? "col" : "row";
-          return (
-            coordinate(i)[axis] === coordinate(current)[axis] &&
-            i !== current &&
-            square !== block
-          );
-        })()}
-        maxlength="1"
-        on:click={(e) => e.target.select()}
-        on:focus={(e) => focus(e, i)}
-        on:input={(e) => {
-          const input = e.target;
-          const v = input.value.toUpperCase();
+  <section id="crossword">
+    <section id="grid-container">
+      <header>
+        <h2>Grid</h2>
+        <button class="clear" on:click={clearGrid}>Clear Grid</button>
+      </header>
+      <div id="grid">
+        {#each grid as square, i}
+          <input
+            id="square-{i}"
+            class="square"
+            class:block={square === block}
+            class:active={i === current}
+            class:axis={(() => {
+              const axis = vertical ? "col" : "row";
+              return (
+                coordinate(i)[axis] === coordinate(current)[axis] &&
+                i !== current &&
+                square !== block
+              );
+            })()}
+            maxlength="1"
+            on:click={(e) => e.target.select()}
+            on:focus={(e) => focus(e, i)}
+            on:input={(e) => {
+              const input = e.target;
+              const v = input.value.toUpperCase();
 
-          if (square !== block && v === block) {
-            grid[reflect(i)] = block;
-          }
-          if (square === block && v !== block) {
-            grid[reflect(i)] = empty;
-          }
+              if (square !== block && v === block) {
+                grid[reflect(i)] = block;
+              }
+              if (square === block && v !== block) {
+                grid[reflect(i)] = empty;
+              }
 
-          const insert = e.inputType === "insertText";
-          grid[i] = insert ? v : empty;
+              const insert = e.inputType === "insertText";
+              grid[i] = insert ? v : empty;
 
-          const n = next(i, insert);
-          if (i === n && grid[i] === empty) {
-            grid[i] = "";
-          }
-          move(e.target, n);
-        }}
-        bind:value={square}
-      />
-    {/each}
-    {#each labels as label}
-      <label
-        class="label"
-        style:top="calc({row(label.index)} * var(--squarepx) + 1.5px)"
-        style:left="calc({col(label.index)} * var(--squarepx) + 1.5px)"
-        for="square-{label.index}"
-        >{label.text}
-      </label>
-    {/each}
+              const n = next(i, insert);
+              if (i === n && grid[i] === empty) {
+                grid[i] = "";
+              }
+              move(e.target, n);
+            }}
+            bind:value={square}
+          />
+        {/each}
+        {#each labels as label}
+          <label
+            class="label"
+            style:top="calc({row(label.index)} * var(--squarepx) + 1.5px)"
+            style:left="calc({col(label.index)} * var(--squarepx) + 1.5px)"
+            for="square-{label.index}"
+            >{label.text}
+          </label>
+        {/each}
+      </div>
+    </section>
+    <section id="hints-container">
+      <header>
+        <h2>Hints</h2>
+        <button class="clear" on:click={clearHints}>Clear Hints</button>
+      </header>
+      <div id="hints">
+        <section>
+          <h3>Down</h3>
+          {#each down as d}
+            <label class="hint">
+              <span>{d.text} {d.word}</span>
+              <input id="down-{d.text}" bind:value={d.hint} />
+            </label>
+          {/each}
+        </section>
+        <section>
+          <h3>Across</h3>
+          {#each across as a}
+            <label class="hint">
+              <span>{a.text} {a.word}</span>
+              <input id="across-{a.text}" bind:value={a.hint} />
+            </label>
+          {/each}
+        </section>
+      </div>
+    </section>
   </section>
 </main>
 
@@ -199,6 +293,11 @@
     margin: 0.5rem 0;
   }
 
+  h2 {
+    margin: 0;
+    margin-bottom: 0.5rem;
+  }
+
   .clear {
     margin-bottom: 0.5rem;
     padding: 0.25rem 0.5rem;
@@ -211,6 +310,27 @@
     background-color: rgb(165, 172, 175);
   }
 
+  #crossword {
+    display: flex;
+    gap: 1rem;
+  }
+
+  @media screen and (max-width: 1000px) {
+    #crossword {
+      flex-direction: column;
+    }
+  }
+
+  #grid-container {
+    max-width: calc(var(--size) * var(--squarepx));
+  }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   #grid {
     display: grid;
     grid-template-columns: repeat(var(--size), var(--squarepx));
@@ -219,6 +339,49 @@
     outline: 1px solid black;
     box-sizing: border-box;
     margin: 0px;
+  }
+
+  #hints-container {
+    width: calc(1000px - calc(var(--size) * var(--squarepx)));
+  }
+
+  #hints {
+    outline: 1px solid black;
+    height: calc(var(--size) * var(--squarepx));
+    overflow: scroll;
+  }
+
+  #hints section {
+    padding: 0.5rem;
+    padding-bottom: 0;
+  }
+
+  #hints h3 {
+    margin: 0;
+    margin-bottom: 0.5rem;
+  }
+
+  .hint {
+    display: flex;
+    margin-bottom: 0.5rem;
+    align-items: center;
+  }
+
+  .hint span {
+    font-size: 12px;
+    font-weight: bold;
+    display: block;
+    width: 225px;
+  }
+
+  .hint input {
+    border: none;
+    width: 100%;
+    border-bottom: 1px solid black;
+  }
+
+  .hint input:focus-visible {
+    outline: none;
   }
 
   .square {
