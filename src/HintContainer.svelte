@@ -87,13 +87,15 @@
 
 <style>
   #container {
-    width: calc(1000px - calc(var(--size) * var(--squarepx)));
+    max-width: calc(1000px - calc(var(--size) * var(--squarepx)));
+    width: 100%;
   }
 
   #hints {
     outline: 1px solid black;
     height: calc(var(--size) * var(--squarepx));
     overflow: scroll;
+    resize: both;
   }
 
   #hints section {

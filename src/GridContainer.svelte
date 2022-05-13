@@ -4,7 +4,6 @@
   import { size, empty, block, coordinate } from "./util";
 
   let vertical = false;
-
   let current;
 
   $: $grid.length && localStorage.setItem("grid", JSON.stringify($grid));
